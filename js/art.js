@@ -3,6 +3,10 @@
 // Orthographic camera and a shared directional light in world coordinates.
 const art=document.querySelector('#world').getContext('2d');
 const introArt=document.querySelector('#egg-world').getContext('2d');
+art.scale(2,2);
+introArt.scale(2,2);
+art.imageSmoothingEnabled=false;
+introArt.imageSmoothingEnabled=false;
 const light=normalize([-0.67,1,0.48]);
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const sub=(a,b)=>a.map((v,i)=>v-b[i]);
@@ -35,7 +39,7 @@ class Scene {
       const area=points.reduce((n,[x,y],i)=>n+x*points[(i+1)%points.length][1]-y*points[(i+1)%points.length][0],0);
       if(Math.abs(area)>.01)this.shadows.push(area<0?points.reverse():points);
     }
-    if(dot(normal,this.view)<=0)return;
+    if(!color||dot(normal,this.view)<=0)return;
     const intensity=this.ambient+.65*Math.max(0,dot(normal,light));
     const tone=shades(color)[Math.min(32,Math.round(intensity*24))];
     const points=vertices.map(v=>this.project(v));
@@ -59,6 +63,23 @@ class Scene {
       this.face(side,color,shadow);
     }
   }
+  rounded(x,y,z,w,h,d,color){
+    const radius=Math.min(w,h,d)*.22;
+    const frame=(height,inset)=>{
+      const x0=x+inset,x1=x+w-inset,z0=z+inset,z1=z+d-inset;
+      const bevel=radius-inset*.5;
+      return [[x0+bevel,height,z0],[x0,height,z0+bevel],[x0,height,z1-bevel],[x0+bevel,height,z1],
+        [x1-bevel,height,z1],[x1,height,z1-bevel],[x1,height,z0+bevel],[x1-bevel,height,z0]];
+    };
+    const rings=[frame(y,radius),frame(y+radius,0),frame(y+h-radius,0),frame(y+h,radius)];
+    for(let row=0;row<rings.length-1;row++){
+      for(let i=0;i<8;i++){
+        const j=(i+1)%8;
+        this.face([rings[row][i],rings[row][j],rings[row+1][j],rings[row+1][i]],color);
+      }
+    }
+    this.face(rings.at(-1),color);
+  }
   draw(shadowColor){
     const g=this.ctx;
     g.beginPath();
@@ -66,31 +87,77 @@ class Scene {
     g.fillStyle=shadowColor;g.fill();
     this.faces.sort((a,b)=>a.depth-b.depth);
     g.lineWidth=.45;
-    for(const {points,tone} of this.faces){
-      g.beginPath();this.path(points);g.fillStyle=tone;g.strokeStyle=tone;g.fill();g.stroke();
+    for(const face of this.faces){
+      if(face.sprite){
+        g.save();
+        g.translate(...face.anchor);g.rotate(face.tilt);
+        g.drawImage(face.sprite,-face.width/2,-face.height,face.width,face.height);
+        g.restore();
+        continue;
+      }
+      g.beginPath();this.path(face.points);g.fillStyle=face.tone;g.strokeStyle=face.tone;g.fill();g.stroke();
     }
   }
 }
 
-const eggRings=[[.02,.31],[.07,.57],[.16,.82],[.29,.97],[.43,1],[.57,.93],[.7,.82],[.83,.65],[.93,.43],[.98,.23],[1,.02]];
-function shell(scene,data,x,y,z,scale,cracked=false,tilt=0){
-  const [dark,base,lightColor,cream]=data.colors;
-  const sides=24;
-  const vertex=(ring,side)=>{
-    const [height,radius]=eggRings[ring];
-    const a=side/sides*Math.PI*2;
-    const px=Math.cos(a)*radius*scale*13;
-    const py=height*scale*35;
-    return [x+px*Math.cos(tilt)-py*Math.sin(tilt),y+px*Math.sin(tilt)+py*Math.cos(tilt),z+Math.sin(a)*radius*scale*13];
-  };
-  for(let row=0;row<eggRings.length-1;row++){
-    for(let side=0;side<sides;side++){
-      const spot=((row*17+side*13)%31)<5;
-      const band=(row===3&&(side+4)%9<4)||(row===6&&(side+2)%11<3);
-      const crack=cracked&&[[9,5],[8,5],[7,6],[6,6],[5,5],[4,5]].some(([r,j])=>r===row&&j===side);
-      scene.face([vertex(row,side),vertex(row+1,side),vertex(row+1,side+1),vertex(row,side+1)],crack?dark:band?cream:spot?lightColor:base);
+// Sample a tapered ellipsoid at native canvas pixel resolution. Its normal
+// drives diffuse and specular lighting, and its surface coordinates carry the pattern.
+const eggSprites=new Map();
+const toRgb=ink=>[1,3,5].map(i=>parseInt(ink.slice(i,i+2),16));
+function eggSprite(data,cracked,turn) {
+  const key=[data.id,cracked,turn].join(':');
+  if(eggSprites.has(key))return eggSprites.get(key);
+  const sprite=document.createElement('canvas');
+  const width=58,height=76;
+  sprite.width=width;sprite.height=height;
+  const g=sprite.getContext('2d');
+  const image=g.createImageData(width,height);
+  const colors=data.colors.map(toRgb);
+  const rotation=turn*Math.PI/32;
+  const viewLight=normalize([light[0],light[1]*.92-light[2]*.38,light[2]*.92+light[1]*.38]);
+  const half=normalize([viewLight[0],viewLight[1],viewLight[2]+1]);
+  for(let py=1;py<height-1;py++){
+    const v=1-2*(py-.5)/(height-2);
+    const taper=1-.19*v;
+    const radius=Math.sqrt(Math.max(0,1-v*v));
+    for(let px=1;px<width-1;px++){
+      const u=(px-width/2)/27/taper;
+      const z2=1-u*u-v*v;
+      if(z2<=0)continue;
+      const z=Math.sqrt(z2);
+      const normal=normalize([u/taper,v*.76+.19*(1-v*v),z/taper]);
+      const azimuth=Math.atan2(u,z)+rotation;
+      const pattern=Math.sin(azimuth*7+v*9)*Math.cos(v*18-azimuth*2);
+      const wave=-.37+.065*Math.sin(azimuth*5);
+      const crack=cracked&&v>.07&&Math.abs(Math.sin(azimuth)-(.17+.09*Math.sin(v*43)))<.028;
+      const color=colors[crack?0:Math.abs(v-wave)<.065?3:pattern>.64&&radius>.45?2:1];
+      const diffuse=Math.max(0,dot(normal,viewLight));
+      const gloss=Math.max(0,dot(normal,half))**48;
+      const rim=(1-z)**3*.07;
+      const factor=.36+diffuse*.72+rim;
+      const grain=((px*29+py*17)%11-5)*.42;
+      const offset=(py*width+px)*4;
+      for(let channel=0;channel<3;channel++)image.data[offset+channel]=color[channel]*factor+gloss*55+grain;
+      image.data[offset+3]=255;
     }
   }
+  g.putImageData(image,0,0);
+  eggSprites.set(key,sprite);
+  return sprite;
+}
+function shell(scene,data,x,y,z,scale,cracked=false,tilt=0,turn=0,stretch=1){
+  const height=35*scale*stretch;
+  const width=27*scale/Math.sqrt(stretch);
+  for(let i=0;i<20;i++){
+    const a=i*Math.PI/10,b=(i+1)*Math.PI/10;
+    scene.face([[x,y,z],[x+Math.cos(a)*width*.48,y+height*.39,z+Math.sin(a)*width*.48],
+      [x+Math.cos(b)*width*.48,y+height*.39,z+Math.sin(b)*width*.48],[x,y+height,z]],null);
+  }
+  scene.faces.push({
+    depth:dot([x,y+height*.5,z],scene.view),
+    sprite:eggSprite(data,cracked,turn),
+    anchor:scene.project([x,y,z]), width,height, tilt
+  });
 }
 
 function vignette(g,x,y,xRadius,yRadius,center,edge){
@@ -108,14 +175,38 @@ function paintIntro(now,motion){
   const choosing=document.querySelector('#egg-intro').classList.contains('choosing');
   g.fillStyle='#090810';g.fillRect(0,0,400,184);
   const scene=new Scene(g,200,122,0,.28,.42);
+  const t=now/1000;
   EGGS.forEach((data,i)=>{
     const x=(i-1)*108;
     const active=hovered===data.id;
-    vignette(g,200+x,115,60,30,active?'#514169':'#2a233a','#09081000');
-    const jump=motion&&active?(choosing?Math.abs(Math.sin(now/47))*12:Math.round((Math.sin(now/360)+1)*1.7)):0;
-    shell(scene,data,x,jump,0,1.55,false,motion&&active?Math.sin(now/200)*.08:0);
+    const phase=t*[2.2,3.8,1.7][i]+i*1.9;
+    const bounce=Math.max(0,Math.sin(phase))**2;
+    const jump=motion?(choosing&&active?Math.abs(Math.sin(t*17))*17:bounce*(active?8:[4,6,3][i])):0;
+    const lean=motion?Math.sin(phase*.82)*(active?.15:.08):0;
+    const stretch=motion?1+Math.sin(phase)*.07+(choosing&&active?jump*.005:0):1;
+    const turn=motion?(Math.floor((Math.sin(phase*.58)+1)*6)+i*12)%64:0;
+    vignette(g,200+x,116,59,30,active?'#493b64':data.colors[0]+'54','#09081000');
+    shell(scene,data,x,jump,0,1.68,false,lean,turn,stretch);
   });
-  scene.draw('#09070e9c');
+  scene.draw('#09070e9e');
+  if(motion)EGGS.forEach((data,i)=>{
+    const x=92+i*108;
+    for(let j=0;j<4;j++){
+      const age=(t*.63+j*.25+i*.12)%1;
+      if(age>.7)continue;
+      const px=Math.round(x+Math.sin(j*12+i*3+age*2)*(20+age*34));
+      const py=Math.round(113-age*63-j*2);
+      g.globalAlpha=Math.sin(age/.7*Math.PI)*(hovered===data.id?.85:.55);
+      spark(g,px,py,data.colors[3],j%2===0?2:1);
+    }
+  });
+  g.globalAlpha=1;
+}
+
+function spark(g,x,y,ink,size){
+  g.fillStyle=ink;
+  g.fillRect(x-size,y,2*size+1,1);
+  g.fillRect(x,y-size,1,2*size+1);
 }
 
 function tree(scene,x,z,size){
@@ -133,24 +224,28 @@ function flower(scene,x,z,petal){
   scene.box(x-1,4,z-1,3,1,3,petal,false);
   scene.box(x,5,z,1,1,1,'#ffe8a2',false);
 }
-function creature(scene,data,x,y,z,stage,form,blink,excited,wear){
+function creature(scene,data,x,y,z,stage,form,blink,excited,wear,pose){
   const [dark,base,soft,cream]=data.colors;
   const scale=[0,.85,1.08,1.25][stage];
   const coat=stage===3?(form===1?'#edab69':'#a8a5eb'):base;
-  const box=(a,b,c,w,h,d,col)=>scene.box(x+a*scale,y+b*scale,z+c*scale,w*scale,h*scale,d*scale,col);
+  const box=(a,b,c,w,h,d,col)=>{
+    const height=1+pose.breathe;
+    const draw=w>=6&&h>=5&&d>=5?scene.rounded:scene.box;
+    draw.call(scene,x+(a+b*pose.lean)*scale,y+b*scale*height,z+c*scale,w*scale,h*scale*height,d*scale,col);
+  };
   box(-10,2,-7,20,15,15,coat);
   box(-12,15,-7,24,16,18,coat);
-  box(-9,31,-5,18,2,13,coat);
+
   box(-9,0,4,6,5,8,soft);box(3,0,4,6,5,8,soft);
   box(-7,16,10,14,7,4,cream);
   if(data.id==='dusk'){
-    box(-10,30,-4,6,16,6,coat);box(3,30,-4,6,19,6,coat);
+    box(-10,30,-4,6,16+pose.ear,6,coat);box(3,30,-4,6,19-pose.ear,6,coat);
     box(-9,34,2,3,10,1,'#e6a4c6');box(4,34,2,3,12,1,'#e6a4c6');
     box(-4,4,-12,8,8,6,cream);
   }else{
     box(-12,28,-5,7,11,7,coat);box(5,28,-5,7,11,7,coat);
     box(-11,31,2,4,5,1,cream);box(6,31,2,4,5,1,cream);
-    box(8,5,-16,8,8,13,coat);box(10,8,-20,6,7,5,cream);
+    box(8+pose.ear,5,-16,8,8,13,coat);box(10+pose.ear,8,-20,6,7,5,cream);
   }
   box(-7,24,11,3,blink?1:4,1,'#32243c');box(4,24,11,3,blink?1:4,1,'#32243c');
   box(-2,21,14,4,2,1,dark);
@@ -218,14 +313,28 @@ function paintWorld(now,state,reactionUntil){
   const data=EGGS.find(entry=>entry.id===state.egg);
   const active=now<reactionUntil;
   const t=now/1000;
-  const jump=state.settings.motion&&active?Math.abs(Math.sin(t*12))*9:0;
+  const moving=state.settings.motion;
+  const hop=Math.max(0,Math.sin(t*(active?12:2.2)))**2;
+  const jump=moving?hop*(active?11:state.pet.stage?5:2):0;
   if(data&&!state.pet.stage){
-    const wiggle=state.settings.motion&&state.milestones.length?Math.sin(t*13)*Math.max(0,Math.sin(t*1.1)-.63)*.45:0;
-    shell(scene,data,0,jump,0,1.18,state.milestones.length>=2,wiggle);
+    const wiggle=moving?Math.sin(t*(active?14:3.1))*(active?.2:.06):0;
+    shell(scene,data,0,jump,0,1.24,state.milestones.length>=2,wiggle,moving?Math.floor((Math.sin(t)+1)*6):0,1+(moving?Math.sin(t*3)*.07:0));
   }else if(data){
-    const drift=state.settings.motion?Math.sin(t*.8)*5:0;
-    const blink=state.settings.motion&&t%4<.16;
-    creature(scene,data,drift,jump,0,state.pet.stage,state.pet.form,blink,active,state.equipped.wear);
+    const drift=moving?Math.sin(t*.85)*13:0;
+    const blink=moving&&(t%4.6<.15||active&&t%1.4<.12);
+    const pose={breathe:moving?Math.sin(t*3.5)*.07+hop*.055:0,
+      lean:moving?Math.cos(t*.85)*.09:0,ear:moving?Math.sin(t*5)*2:0};
+    creature(scene,data,drift,jump,0,state.pet.stage,state.pet.form,blink,active,state.equipped.wear,pose);
   }
   scene.draw(night?'#30364c7b':'#374e4870');
+  if(moving){
+    for(let i=0;i<(active?15:7);i++){
+      const age=(t*(active?1.1:.31)+i*.137)%1;
+      const x=Math.round((active?111:17)+(i*57)%(active?98:288)+Math.sin(t+i)*6);
+      const y=Math.round((active?142:151)-age*(active?64:30)-(i*13)%22);
+      g.globalAlpha=Math.sin(age*Math.PI)*(active?.94:.55);
+      spark(g,x,y,i%2?'#ffe99c':'#fff9d5',active&&i%3===0?3:1);
+    }
+    g.globalAlpha=1;
+  }
 }

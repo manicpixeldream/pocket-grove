@@ -28,3 +28,62 @@ dialog{border:2px solid #d6c3ef;border-radius:16px;padding:20px;width:min(510px,
 .panel-title h2{font-family:"Courier New",monospace;letter-spacing:-.6px}
 .tile{border-radius:4px;box-shadow:inset -2px -2px #37244b12,inset 2px 2px #ffffff6e}
 .primary{border-radius:5px}
+
+/* The meadow and menus share the same warm field-guide palette. */
+:root{
+  --ink:#263b33;--muted:#4f6356;--line:#a9baa1;--accent:#37674f;
+  --paper:#fff8e7;--lav:#e5ecda;--shadow:#bcc7a8;background:#e4ead7;
+}
+body{
+  background-color:#e9eeda;
+  background-image:linear-gradient(90deg,#dbe4c7 2px,transparent 2px),linear-gradient(#dbe4c7 2px,transparent 2px);
+  background-size:22px 22px;
+}
+.bar{background:#263e34;color:#fff4d5;border-bottom:4px solid #142b25}
+.brand-mark{background:#60835a;border-color:#93a772;color:#fff2b1;box-shadow:3px 3px #152b21,inset 2px 2px #a7b980}
+.brand small,.bar .stat{color:#e8ead1}
+.bar .stat{background:#385447;border:2px solid #688271;border-radius:2px}
+.bar .stat i{color:#d2e59e}
+.bar .stat.coin{background:#6f563c;border-color:#aa8a55;color:#fff0bc}
+.bar .stat.coin i{color:#ffd268}
+.bar .icon-button{background:#4c6856;color:#fff2cb;border-color:#89a181;box-shadow:2px 3px #172c25}
+.welcome h1,.panel-title h2,.dialog-head h2,.goal h3,.growth strong,.place strong,.onboard-title{
+  font-family:"Courier New",monospace;font-weight:900;
+}
+.eyebrow,.eyebrow span{color:#46694c}
+.panel{
+  border:2px solid #647f65;border-radius:3px;box-shadow:4px 4px #4960494a,inset 0 0 0 2px #f1e7c9;
+}
+.clipboard{background:#fff5dc;border-color:#96744f;box-shadow:4px 4px #725d4550,inset 0 0 0 2px #f1dfb5}
+.clip{border-radius:2px;background:#c1935c;border-color:#765a3d}
+.tile,.place .tile{border-radius:2px;border:1px solid #31463640;box-shadow:2px 2px #3146362b,inset 2px 2px #fff9}
+.tile.green{background:#b9d4a9;color:#345c44}
+.tile.peach{background:#eac493;color:#724a2e}
+.tile.yellow{background:#f0d58a;color:#76551c}
+.tile.rose{background:#eac0aa;color:#824c4f}
+.tile.lavender{background:#d3cee3;color:#504979}
+.tile.blue{background:#c7d9db;color:#375b69}
+.scene{border:2px solid #536b52;border-radius:2px;box-shadow:2px 3px #52684e45}
+.scene-label,.stage{border-radius:2px;background:#fff0c2;border:1px solid #a89868;color:#3d5039}
+.goal,.goal-empty,.growth,.place,.tip{border-radius:2px}
+.goal{background:#fffaf0;border-color:#d9c399}
+.goal-empty{background:#f6e7c5;border-color:#bca078}
+.goal-empty p,.empty-icon{color:#755738}
+.growth,.place{background:#edf1de;border-color:#b2bea1}
+.place:hover{background:#e0ebcc}
+.tip{background:#f4eccb;border-color:#d8c388}
+.meter{border-radius:0;border-color:#b6beaa;background:repeating-linear-gradient(90deg,#d9dfcb 0 8px,#e4e9d9 8px 10px)}
+.meter span{background:repeating-linear-gradient(90deg,#699966 0 8px,#81a67a 8px 10px);box-shadow:inset 0 2px #a0bf87}
+.goal.complete .meter span{background:#60915d}
+.primary,.secondary,.icon-button,.mini{border-radius:2px}
+.primary{background:#396c51;border:2px solid #254b3a;box-shadow:3px 3px #254b3a,inset 0 2px #799a64}
+.secondary,.icon-button{background:#fcf1d3;border:2px solid #a38d62;box-shadow:2px 3px #977d5549}
+.mini,.link{color:#284f3d}
+.mini{background:#e5ecd7;border:1px solid #b0bd9f;box-shadow:1px 1px #adb79a}
+.danger{background:#f7dfd5;color:#7c3232;border-color:#d5a69a}
+dialog{background:#fff6df;border:3px solid #607866;border-radius:3px;box-shadow:5px 6px #223b34a6,inset 0 0 0 2px #e0d2a7}
+dialog::backdrop{background:#182921ac}
+.dialog-body input:not([type=checkbox]),.dialog-body select{border:2px solid #a5ad91;border-radius:2px;background:#fffbec}
+.toast{background:#293f36;border-radius:2px;border:2px solid #8ca076;box-shadow:3px 3px #2e443b}
+button:focus-visible,input:focus-visible,select:focus-visible{outline-color:#4c8260}
+.egg-select:focus-visible{outline-color:#b994ef}
