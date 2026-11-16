@@ -13,6 +13,7 @@ const today = () => {
 };
 const sum = entries => entries.reduce((total,entry)=>total+entry.amount,0);
 const isAmount = value => Number.isSafeInteger(value)&&value>0&&value<=100000000;
+const isSavingsAmount = value => Number.isSafeInteger(value)&&isAmount(Math.abs(value));
 const isDate = value => typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value));
 const isId = value => typeof value==='string'&&/^[\w-]{1,80}$/.test(value);
 const isName = value => typeof value==='string'&&value.trim().length>0&&value.length<=60;
@@ -25,14 +26,14 @@ const fresh = () => ({
 function validate(saved) {
   if(!saved||saved.version!==1)throw Error('Choose a Pocket Grove save file.');
   const list=(value,test)=>Array.isArray(value)&&value.length<=10000&&value.every(test);
-  const entry=e=>e&&isId(e.id)&&isAmount(e.amount)&&isDate(e.date);
+  const entry=(e,validAmount)=>e&&isId(e.id)&&validAmount(e.amount)&&isDate(e.date);
   const records=(value,test)=>list(value,test)&&unique(value.map(e=>e.id));
   const eggValid=saved.egg===null||EGGS.some(e=>e.id===saved.egg);
   const petValid=saved.pet&&[0,1,2,3].includes(saved.pet.stage)&&(saved.pet.stage===3?[0,1].includes(saved.pet.form):saved.pet.form===null);
   const known=(entries,value)=>entries.some(e=>e.id===value);
   if(!eggValid||!petValid||
-    !records(saved.goals,g=>g&&isId(g.id)&&isName(g.name)&&isAmount(g.target)&&(g.deadline===''||isDate(g.deadline))&&records(g.entries,entry))||
-    !records(saved.expenses,e=>entry(e)&&isName(e.name)&&CATEGORIES.includes(e.category))||
+    !records(saved.goals,g=>g&&isId(g.id)&&isName(g.name)&&isAmount(g.target)&&(g.deadline===''||isDate(g.deadline))&&records(g.entries,e=>entry(e,isSavingsAmount)))||
+    !records(saved.expenses,e=>entry(e,isAmount)&&isName(e.name)&&CATEGORIES.includes(e.category))||
     !list(saved.milestones,isId)||!unique(saved.milestones)||
     !list(saved.achievements,a=>known(ACHIEVEMENTS,a))||!unique(saved.achievements)||
     !list(saved.owned,o=>known(ITEMS,o))||!unique(saved.owned)||
@@ -70,7 +71,7 @@ function metrics() {
   return {
     saved,spent:sum(state.expenses),target:state.goals.reduce((n,g)=>n+g.target,0),
     complete:state.goals.filter(g=>sum(g.entries)>=g.target).length,
-    goals:state.milestones.length,days:new Set(entries.map(e=>e.date)).size,
+    goals:state.milestones.length,days:new Set(entries.filter(e=>e.amount>0).map(e=>e.date)).size,
     hatched:state.pet.stage>=1,stage:state.pet.stage
   };
 }
@@ -116,7 +117,7 @@ function commit(message='') {
 
 const button=(action,label,extra='',className='mini')=>'<button type="button" class="'+className+'" data-action="'+action+'" '+extra+'>'+label+'</button>';
 const meter=(percent,label)=>'<div class="meter" role="progressbar" aria-label="'+escapeHtml(label)+'" aria-valuenow="'+percent+'" aria-valuemin="0" aria-valuemax="100"><span style="width:'+percent+'%"></span></div>';
-const ratio=(a,b)=>b?Math.min(100,Math.floor(a/b*100)):0;
+const ratio=(a,b)=>b?Math.max(0,Math.min(100,Math.floor(a/b*100))):0;
 const goalById=key=>state.goals.find(g=>g.id===key);
 const stageName=()=>['Egg','Baby','Growing','Evolved'][state.pet.stage];
 
@@ -188,7 +189,8 @@ function editGoal(g) {
     (g?button('delete-goal','Delete goal','data-id="'+g.id+'"','mini danger'):''));
 }
 function contribution(g,entry) {
-  open(entry?'Edit savings entry':'Record savings','<p>'+escapeHtml(g.name)+'</p>'+form('entry',amountField('Amount saved ($)',entry?.amount)+dateField('Date',entry?.date??today()),'Save entry','data-id="'+g.id+'" data-entry="'+(entry?.id??'')+'"'));
+  const amount='<label>Amount ($)<input name="amount" type="text" maxlength="11" required value="'+(entry?entry.amount/100:'')+'" aria-describedby="entry-amount-hint"></label>';
+  open(entry?'Edit savings entry':'Record savings','<p>'+escapeHtml(g.name)+'</p><p id="entry-amount-hint">Enter a negative amount, like −5.00, to subtract money from this goal.</p>'+form('entry',amount+dateField('Date',entry?.date??today()),'Save entry','data-id="'+g.id+'" data-entry="'+(entry?.id??'')+'"'));
 }
 function history(g) {
   open('Savings entries','<p>'+escapeHtml(g.name)+' · '+usd(sum(g.entries))+' recorded</p>'+
@@ -253,10 +255,16 @@ document.addEventListener('submit',event=>{
   event.preventDefault();
   const data=new FormData(formElement);
   const name=String(data.get('name')??'').trim();
-  const amount=Math.round(Number(data.get('amount'))*100);
+  const amountText=String(data.get('amount')??'').trim().replace(/^−/,'-');
+  const amount=Math.round(Number(amountText)*100);
+  const validAmount=kind==='entry'
+    ? /^-?(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(amountText)&&isSavingsAmount(amount)
+    : isAmount(amount);
   const date=String(data.get('date')??'');
-  if(!isAmount(amount)||(kind!=='entry'&&!isName(name))||((kind!=='goal'||date)&&!isDate(date))){
-    formElement.querySelector('.error').textContent='Check the name, amount, and date, then try again.';
+  if(!validAmount||(kind!=='entry'&&!isName(name))||((kind!=='goal'||date)&&!isDate(date))){
+    formElement.querySelector('.error').textContent=kind==='entry'&&!validAmount
+      ? 'Enter a nonzero amount with up to two decimal places, such as 5 or -5.00.'
+      : 'Check the name, amount, and date, then try again.';
     return;
   }
   const key=formElement.dataset.id;
@@ -270,7 +278,7 @@ document.addEventListener('submit',event=>{
     const entry=g.entries.find(e=>e.id===formElement.dataset.entry);
     if(entry)Object.assign(entry,{amount,date});
     else g.entries.push({id:id(),amount,date});
-    dialog.close();commit('Savings recorded.');
+    dialog.close();commit('Savings entry saved.');
   }
   if(kind==='expense'){
     const category=data.get('category');

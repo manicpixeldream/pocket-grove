@@ -12,7 +12,7 @@ Place the contents of this directory at the root of a GitHub repository. In the 
 
 ## Play
 
-Choose an egg, create a savings goal, and record the money you set aside. Complete three goals to hatch your egg and five to reach the growing stage. From there, complete nine goals for one final form, or complete at least seven goals and record savings on four different days for the other.
+Choose an egg, create a savings goal, and record the money you set aside. Enter a negative savings record, such as `-5.00`, to subtract money spent from that goal. Complete three goals to hatch your egg and five to reach the growing stage. From there, complete nine goals for one final form, or complete at least seven goals and record savings on four different days for the other.
 
 Goal completion rewards are awarded once per goal. Editing or removing an entry updates the budget figures while previously earned rewards and growth stay with your pet. Grove coins are cosmetic currency.
 
