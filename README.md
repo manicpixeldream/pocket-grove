@@ -1,6 +1,6 @@
 # Pocket Grove
 
-Pocket Grove is a browser-local savings tracker and pixel-art pet game. The project uses plain HTML, CSS, and JavaScript, with pixel artwork drawn in Canvas.
+Pocket Grove is a browser-local savings tracker and pixel-art pet game. The project uses plain HTML, CSS, and JavaScript, with lit 3D geometry rendered at pixel-art resolution in Canvas.
 
 ## Run locally
 

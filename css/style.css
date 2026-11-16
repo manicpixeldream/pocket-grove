@@ -11,3 +11,20 @@ dialog{border:2px solid #d6c3ef;border-radius:16px;padding:20px;width:min(510px,
 .dialog-body>.meter{margin-top:7px}
 .dialog-body .row:first-child{padding-top:0}
 @media(prefers-reduced-motion:no-preference){button{transition:filter .12s,background-color .12s,border-color .12s}.meter span{transition:width .25s}}
+
+/* The screen stays dark until an egg is chosen. */
+.egg-intro{position:fixed;inset:0;z-index:15;display:grid;place-items:center;background:#090810;overflow:hidden}
+.egg-stage{position:relative;width:min(960px,100vw);margin-top:-5vh}
+.egg-stage canvas{width:100%;height:auto;display:block;image-rendering:pixelated}
+.egg-choices{position:absolute;inset:19% 6.5% 14%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2%}
+.egg-select{position:relative;background:transparent;border:0;border-radius:4px;color:#f6e9ff;padding:0;box-shadow:none}
+.egg-select:focus-visible{outline:2px solid #b994ef;outline-offset:-4px}
+.egg-name{position:absolute;bottom:0;left:0;right:0;opacity:0;text-align:center;font:700 clamp(10px,2vw,15px) "Courier New",monospace;text-shadow:2px 2px #080811;pointer-events:none}
+.egg-select:is(:hover,:focus-visible,.chosen) .egg-name{opacity:1}
+.egg-select:not(:disabled):active{transform:none}
+/* Chunky UI edges echo the low-resolution habitat. */
+.scene{border-radius:5px}
+.scene-label,.brand-mark,.egg-select{border-radius:3px}
+.panel-title h2{font-family:"Courier New",monospace;letter-spacing:-.6px}
+.tile{border-radius:4px;box-shadow:inset -2px -2px #37244b12,inset 2px 2px #ffffff6e}
+.primary{border-radius:5px}

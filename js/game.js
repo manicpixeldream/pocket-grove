@@ -131,7 +131,12 @@ function render() {
   $('#stage').textContent=egg?'✦  '+stageName():'✦  Choose an egg';
   $('#habitat-subtitle').textContent=state.pet.stage?(state.pet.stage===3?egg.forms[state.pet.form]:egg.pet+' the '+egg.species):'A quiet corner of the grove';
   $('.pet-button').hidden=!egg;
-  $('#habitat-content').innerHTML=egg?growth(m):'<h3 class="onboard-title">Choose your egg</h3><p class="onboard-copy">Three eggs, three surprises. Which one will you raise?</p><div class="eggs">'+EGGS.map(e=>button('egg',e.name+'<small>'+e.theme+'</small>','data-id="'+e.id+'"','egg-option')).join('')+'</div>';
+  const intro=$('#egg-intro');
+  intro.hidden=Boolean(egg);
+  document.querySelector('.bar').inert=!egg;
+  document.querySelector('main').inert=!egg;
+  if(!egg)$('#egg-choices').innerHTML=EGGS.map(e=>button('egg','<span class="egg-name">'+e.name+'</span>','data-id="'+e.id+'" aria-label="Choose '+e.name+' · '+e.theme+'"','egg-select')).join('');
+  $('#habitat-content').innerHTML=egg?growth(m):'';
   $('#goals').innerHTML=state.goals.length?'<p class="overview-line"><b>'+usd(m.saved)+'</b> recorded across '+state.goals.length+' '+(state.goals.length===1?'goal':'goals')+'.</p>'+state.goals.map(goalCard).join(''):'<div class="goal-empty"><span class="empty-icon" aria-hidden="true">◇</span><b>Your clipboard is empty</b><p>What would you like to save for?</p></div>';
   $('#places').innerHTML=PLACES.map(p=>{
     const locked=m.goals<p.unlock;
@@ -289,10 +294,19 @@ document.addEventListener('click',event=>{
     case 'close':dialog.close();break;
     case 'egg':
       if(!state.egg&&EGGS.some(e=>e.id===key)){
-        state.egg=key;
-        commit();
-        if(!state.pet.stage)react('Your egg is cozy in its new home!');
-        $('.pet-button').focus();
+        if($('#egg-intro').classList.contains('choosing'))break;
+        const intro=$('#egg-intro');
+        intro.classList.add('choosing');
+        target.classList.add('chosen');
+        const enter=()=>{
+          state.egg=key;
+          intro.classList.remove('choosing');
+          commit();
+          if(!state.pet.stage)react('Your egg is cozy in its new home!');
+          $('.pet-button').focus();
+        };
+        if(state.settings.motion)setTimeout(enter,480);
+        else enter();
       }break;
     case 'pet':react(state.pet.stage?'Your companion is happy to see you!':'A little warmth for your egg.');break;
     case 'budget':budget();break;
@@ -369,13 +383,15 @@ document.addEventListener('change',async event=>{
 
 function animate(now) {
   if(now-lastFrame>32){
-    paintWorld(now,state,reactionUntil);
+    if(state.egg)paintWorld(now,state,reactionUntil);
+    else paintIntro(now,state.settings.motion);
     if(now>=reactionUntil&&$('#reaction').textContent)$('#reaction').textContent='';
     lastFrame=now;
   }
   requestAnimationFrame(animate);
 }
 render();
-paintWorld(performance.now(),state,0);
+if(state.egg)paintWorld(performance.now(),state,0);
+else paintIntro(performance.now(),state.settings.motion);
 requestAnimationFrame(animate);
 if(loadError)notify(loadError);
