@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f5f1ff">
+<title>Pocket Grove · A little world for your savings</title>
+<link rel="stylesheet" href="css/style.css">
+<script defer src="js/data.js"></script>
+<script defer src="js/art.js"></script>
+<script defer src="js/game.js"></script>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-inner">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">✿</span><div><strong>Pocket Grove</strong><small>YOUR SAVINGS ADVENTURE</small></div></div>
+    <div class="stats" id="stats"></div>
+    <button class="icon-button" data-action="settings" aria-label="Settings" title="Settings">⚙</button>
+  </div>
+</header>
+<main>
+  <section class="welcome"><div><div class="eyebrow"><span>✦</span> YOUR LITTLE WORLD</div><h1 id="welcome-title">Welcome to the Grove!</h1><p id="welcome-copy">Grow your savings and raise a little companion along the way.</p></div><button class="secondary" data-action="budget">▤ &nbsp; Budget overview</button></section>
+  <div class="layout">
+    <section class="panel clipboard" aria-labelledby="goals-heading">
+      <div class="clip" aria-hidden="true"></div>
+      <div class="panel-title"><span class="tile peach" aria-hidden="true">▤</span><div><h2 id="goals-heading">Savings Goals</h2><small>One step at a time</small></div></div>
+      <div id="goals"></div>
+      <button class="primary wide" data-action="new-goal">＋ &nbsp; New savings goal</button>
+    </section>
+    <section class="panel habitat" aria-labelledby="habitat-heading">
+      <div class="habitat-head"><div class="panel-title"><span class="tile green" aria-hidden="true">✿</span><div><h2 id="habitat-heading">Pet Habitat</h2><small id="habitat-subtitle">A quiet corner of the grove</small></div></div><span class="stage" id="stage"></span></div>
+      <div class="scene" id="scene"><canvas id="world" width="320" height="190" aria-hidden="true"></canvas><button class="pet-button" data-action="pet" aria-label="Interact with your companion" hidden></button><span class="scene-label">✦ &nbsp; THE MEADOW</span><span class="reaction" id="reaction" aria-hidden="true"></span></div>
+      <div id="habitat-content"></div>
+    </section>
+    <aside class="panel grove" aria-labelledby="grove-heading">
+      <div class="panel-title"><span class="tile yellow" aria-hidden="true">✦</span><div><h2 id="grove-heading">The Grove</h2><small>Places to explore</small></div></div>
+      <div id="places"></div>
+      <div class="tip"><span aria-hidden="true">✧</span><div><strong>Small steps count!</strong><p>Pick a goal that fits your life. Every bit you record brings it closer.</p></div></div>
+    </aside>
+  </div>
+  <footer><span>✿ &nbsp; POCKET GROVE</span><span>Your progress lives in this browser. <button class="link" data-action="settings">Manage save data</button></span></footer>
+</main>
+<dialog id="dialog"><div id="dialog-content"></div></dialog>
+<div role="status" id="toast" class="toast"></div>
+<input type="file" id="import-file" accept=".json,application/json" hidden>
+</body>
+</html>
