@@ -80,6 +80,17 @@ class Scene {
     }
     this.face(rings.at(-1),color);
   }
+  litVolume(x,y,z,w,h,d,color,profile='round'){
+    this.rounded(x,y,z,w,h,d,null);
+    const center=[x+w/2,y+h/2,z+d/2];
+    const [cx,cy]=this.project(center);
+    const projectedWidth=Math.hypot(this.right[0]*w,this.right[2]*d);
+    const height=Math.hypot(this.up[0]*w,this.up[1]*h,this.up[2]*d);
+    this.faces.push({
+      depth:dot(center,this.view),sprite:volumeSprite(color,profile,this.ambient<.5),
+      anchor:[cx,cy+height/2],width:projectedWidth,height,tilt:0
+    });
+  }
   draw(shadowColor){
     const g=this.ctx;
     g.beginPath();
@@ -104,6 +115,49 @@ class Scene {
 // drives diffuse and specular lighting, and its surface coordinates carry the pattern.
 const eggSprites=new Map();
 const toRgb=ink=>[1,3,5].map(i=>parseInt(ink.slice(i,i+2),16));
+const viewLight=normalize([light[0],light[1]*.92-light[2]*.38,light[2]*.92+light[1]*.38]);
+const half=normalize([viewLight[0],viewLight[1],viewLight[2]+1]);
+
+function shadePixel(image,offset,color,normal,z,px,py,tone=1){
+  const diffuse=Math.max(0,dot(normal,viewLight));
+  const gloss=Math.max(0,dot(normal,half))**48;
+  const rim=(1-z)**3*.07;
+  const factor=(.36+diffuse*.72+rim)*tone;
+  const grain=((px*29+py*17)%11-5)*.42;
+  for(let channel=0;channel<3;channel++)image.data[offset+channel]=color[channel]*factor+gloss*55*tone+grain;
+  image.data[offset+3]=255;
+}
+
+const volumeSprites=new Map();
+function volumeSprite(ink,profile,night){
+  const key=[ink,profile,night].join(':');
+  if(volumeSprites.has(key))return volumeSprites.get(key);
+  const sprite=document.createElement('canvas');
+  const size=72;
+  sprite.width=size;sprite.height=size;
+  const g=sprite.getContext('2d');
+  const image=g.createImageData(size,size);
+  const base=toRgb(ink);
+  const exponent=profile==='round'?2:profile==='foliage'?2.35:3.25;
+  for(let py=0;py<size;py++){
+    const v=1-2*(py+.5)/size;
+    for(let px=0;px<size;px++){
+      const u=2*(px+.5)/size-1;
+      const angle=Math.atan2(v,u);
+      const texture=profile==='foliage'?1+.05*Math.sin(angle*9)+.023*Math.cos(angle*17):1;
+      const power=1-(Math.abs(u/texture)**exponent+Math.abs(v/texture)**exponent);
+      if(power<=0)continue;
+      const z=power**(1/exponent);
+      const normal=normalize([Math.sign(u)*Math.abs(u)**(exponent-1),
+        Math.sign(v)*Math.abs(v)**(exponent-1),z**(exponent-1)]);
+      const mottled=profile==='foliage'?1+.10*Math.sin(u*22+v*17)*Math.cos(u*16-v*28):1;
+      shadePixel(image,(py*size+px)*4,base,normal,z,px,py,mottled*(night?.78:1));
+    }
+  }
+  g.putImageData(image,0,0);
+  volumeSprites.set(key,sprite);
+  return sprite;
+}
 function eggSprite(data,cracked,turn) {
   const key=[data.id,cracked,turn].join(':');
   if(eggSprites.has(key))return eggSprites.get(key);
@@ -114,8 +168,6 @@ function eggSprite(data,cracked,turn) {
   const image=g.createImageData(width,height);
   const colors=data.colors.map(toRgb);
   const rotation=turn*Math.PI/32;
-  const viewLight=normalize([light[0],light[1]*.92-light[2]*.38,light[2]*.92+light[1]*.38]);
-  const half=normalize([viewLight[0],viewLight[1],viewLight[2]+1]);
   for(let py=1;py<height-1;py++){
     const v=1-2*(py-.5)/(height-2);
     const taper=1-.19*v;
@@ -131,14 +183,7 @@ function eggSprite(data,cracked,turn) {
       const wave=-.37+.065*Math.sin(azimuth*5);
       const crack=cracked&&v>.07&&Math.abs(Math.sin(azimuth)-(.17+.09*Math.sin(v*43)))<.028;
       const color=colors[crack?0:Math.abs(v-wave)<.065?3:pattern>.64&&radius>.45?2:1];
-      const diffuse=Math.max(0,dot(normal,viewLight));
-      const gloss=Math.max(0,dot(normal,half))**48;
-      const rim=(1-z)**3*.07;
-      const factor=.36+diffuse*.72+rim;
-      const grain=((px*29+py*17)%11-5)*.42;
-      const offset=(py*width+px)*4;
-      for(let channel=0;channel<3;channel++)image.data[offset+channel]=color[channel]*factor+gloss*55+grain;
-      image.data[offset+3]=255;
+      shadePixel(image,(py*width+px)*4,color,normal,z,px,py);
     }
   }
   g.putImageData(image,0,0);
@@ -210,19 +255,18 @@ function spark(g,x,y,ink,size){
 }
 
 function tree(scene,x,z,size){
-  const cube=(a,b,c,w,h,d,color)=>scene.box(x+a*size,b*size,z+c*size,w*size,h*size,d*size,color);
-  cube(-3,0,-3,6,32,6,'#a37a55');
-  cube(-13,20,-10,26,14,21,'#508963');
-  cube(-16,27,-13,32,13,26,'#609b67');
-  cube(-11,38,-9,22,8,19,'#76ad70');
-  cube(-6,45,-5,12,4,11,'#91bf77');
-  cube(-17,33,1,7,5,7,'#78a568');
-  cube(10,36,7,4,4,4,'#ecc079');
+  const volume=(a,b,c,w,h,d,color,profile)=>scene.litVolume(x+a*size,b*size,z+c*size,w*size,h*size,d*size,color,profile);
+  volume(-3,0,-3,6,35,7,'#a37a55','bevel');
+  volume(-15,21,-12,31,27,23,'#599b68','foliage');
+  volume(-16,24,-6,19,16,18,'#78ae72','foliage');
+  volume(1,28,-6,20,19,17,'#61a074','foliage');
+  volume(-9,34,-2,18,16,16,'#9bc47c','foliage');
+  volume(9,35,9,4,4,4,'#f0ca82');
 }
 function flower(scene,x,z,petal){
   scene.box(x,0,z,1,4,1,'#5e925d',false);
-  scene.box(x-1,4,z-1,3,1,3,petal,false);
-  scene.box(x,5,z,1,1,1,'#ffe8a2',false);
+  scene.litVolume(x-1.5,4,z-1,4,2,3,petal);
+  scene.litVolume(x-.2,5,z,1.6,1.5,1.5,'#ffe8a2');
 }
 function creature(scene,data,x,y,z,stage,form,blink,excited,wear,pose){
   const [dark,base,soft,cream]=data.colors;
@@ -230,8 +274,9 @@ function creature(scene,data,x,y,z,stage,form,blink,excited,wear,pose){
   const coat=stage===3?(form===1?'#edab69':'#a8a5eb'):base;
   const box=(a,b,c,w,h,d,col)=>{
     const height=1+pose.breathe;
-    const draw=w>=6&&h>=5&&d>=5?scene.rounded:scene.box;
-    draw.call(scene,x+(a+b*pose.lean)*scale,y+b*scale*height,z+c*scale,w*scale,h*scale*height,d*scale,col);
+    const profile=w>=16||h>10?'bevel':'round';
+    scene.litVolume(x+(a+b*pose.lean)*scale,y+b*scale*height,z+c*scale,
+      w*scale,h*scale*height,d*scale,col,profile);
   };
   box(-10,2,-7,20,15,15,coat);
   box(-12,15,-7,24,16,18,coat);
@@ -247,7 +292,8 @@ function creature(scene,data,x,y,z,stage,form,blink,excited,wear,pose){
     box(-11,31,2,4,5,1,cream);box(6,31,2,4,5,1,cream);
     box(8+pose.ear,5,-16,8,8,13,coat);box(10+pose.ear,8,-20,6,7,5,cream);
   }
-  box(-7,24,11,3,blink?1:4,1,'#32243c');box(4,24,11,3,blink?1:4,1,'#32243c');
+  box(-7,23,12,3.6,blink?1:5,1,'#32243c');box(4,23,12,3.6,blink?1:5,1,'#32243c');
+  if(!blink){box(-6.8,26,13,1.2,1.4,1,'#fff5dc');box(4.2,26,13,1.2,1.4,1,'#fff5dc');}
   box(-2,21,14,4,2,1,dark);
   box(-10,20,11,4,2,1,'#eea6b6');box(6,20,11,4,2,1,'#eea6b6');
   if(excited)box(-1,18,14,2,3,1,dark);
@@ -282,9 +328,24 @@ function paintWorld(now,state,reactionUntil){
     tree(scene,x,z,.63+i%3*.17);
   }
   const patch=(x,z,w,d,c)=>scene.ground([[x,0,z],[x+w,0,z],[x+w,0,z+d],[x,0,z+d]],c);
-  patch(-43,-18,86,49,night?'#839b76':'#c8d29a');
-  patch(-120,-9,34,23,'#74adac');patch(-116,-6,26,17,'#8bc5c1');
+  const clearing=(x,z,rx,rz,color)=>scene.ground(Array.from({length:24},(_,i)=>{
+    const angle=i*Math.PI/12;
+    const edge=1+.07*Math.cos(angle*5);
+    return [x+Math.cos(angle)*rx*edge,0,z+Math.sin(angle)*rz*edge];
+  }),color);
+  clearing(0,7,48,29,night?'#839b76':'#c8d29a');
+  clearing(-103,3,18,12,'#74adac');clearing(-103,3,15,9,'#8bc5c1');
   patch(-109,2,9,3,'#b0d8c1');
+  for(let i=0;i<220;i++){
+    const x=(i*953%661)*.62-204,z=(i*727%487)*.57-142;
+    const [px,py]=scene.project([x,0,z]);
+    g.fillStyle=i%3===0?'#f3f1c92b':'#456d4726';
+    g.fillRect(Math.round(px*2)/2,Math.round(py*2)/2,i%4===0?1:.5,.5);
+  }
+  for(let i=0;i<5;i++){
+    const shift=state.settings.motion?Math.sin(now/900+i)*1.7:0;
+    patch(-116+i*4+shift,-4+i*2,4+i%3,1,'#d7f4d17a');
+  }
   for(let i=0;i<63;i++){
     const x=-163+(i*43)%326,z=-111+(i*31)%215;
     if(Math.abs(x)<43&&z>-22&&z<40)continue;
@@ -305,8 +366,8 @@ function paintWorld(now,state,reactionUntil){
     scene.box(-48,0,13,10,8,9,'#bf8665');
     scene.box(-45,8,16,4,11,3,'#64995f');scene.box(-48,13,15,10,4,6,'#80b46f');
   }
-  if(state.equipped.season){scene.box(48,0,28,13,9,11,'#eba55f');scene.box(52,9,32,3,3,3,'#72915c');}
-  if(state.equipped.toy){scene.box(32,0,11,9,9,9,'#a981ce');scene.box(34,9,13,5,1,4,'#efd183');}
+  if(state.equipped.season){scene.litVolume(48,0,28,13,9,11,'#eba55f');scene.litVolume(52,9,32,3,3,3,'#72915c');}
+  if(state.equipped.toy){scene.litVolume(32,0,11,9,9,9,'#a981ce');scene.litVolume(34,7,17,5,1,4,'#efd183');}
   if(state.milestones.length>=4){
     flower(scene,-38,22,'#e99abf');flower(scene,-34,24,'#ffdc8d');flower(scene,32,-15,'#e99abf');
   }
