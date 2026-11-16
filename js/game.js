@@ -183,9 +183,9 @@ dialog.addEventListener('close',()=>{
 const form=(kind,fields,label,attrs='')=>'<form data-form="'+kind+'" '+attrs+'>'+fields+'<p class="error" role="alert"></p><button class="primary" type="submit">'+label+'</button></form>';
 const textField=(label,name,value='')=>'<label>'+label+'<input name="'+name+'" maxlength="60" required value="'+escapeHtml(value)+'"></label>';
 const amountField=(label,amount)=>'<label>'+label+'<input name="amount" type="number" inputmode="decimal" min="0.01" max="1000000" step="0.01" required value="'+(amount?amount/100:'')+'"></label>';
-const dateField=(label,value,optional=false)=>'<label>'+label+'<input name="date" type="date" value="'+value+'" '+(optional?'':'required')+'></label>';
+const dateField=(label,value,optional=false,min='')=>'<label>'+label+'<input name="date" type="date" value="'+value+'" '+(min?'min="'+min+'" ':'')+(optional?'':'required')+'></label>';
 function editGoal(g) {
-  open(g?'Edit savings goal':'New savings goal',form('goal',textField('What are you saving for?','name',g?.name)+amountField('Target amount ($)',g?.target)+dateField('Target date (optional)',g?.deadline??'',true),'Save goal',g?'data-id="'+g.id+'"':'')+
+  open(g?'Edit savings goal':'New savings goal',form('goal',textField('What are you saving for?','name',g?.name)+amountField('Target amount ($)',g?.target)+dateField('Target date (optional)',g?.deadline??'',true,today()),'Save goal',g?'data-id="'+g.id+'"':'')+
     (g?button('delete-goal','Delete goal','data-id="'+g.id+'"','mini danger'):''));
 }
 function contribution(g,entry) {
@@ -265,6 +265,10 @@ document.addEventListener('submit',event=>{
     formElement.querySelector('.error').textContent=kind==='entry'&&!validAmount
       ? 'Enter a nonzero amount with up to two decimal places, such as 5 or -5.00.'
       : 'Check the name, amount, and date, then try again.';
+    return;
+  }
+  if(kind==='goal'&&date&&date<today()){
+    formElement.querySelector('.error').textContent='Choose today or a later target date, or leave it blank.';
     return;
   }
   const key=formElement.dataset.id;
